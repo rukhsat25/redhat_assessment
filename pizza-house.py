@@ -56,7 +56,7 @@ def get_orders_by_id(order_id):
         return not_found()
     return resp
 
-#error_handler if order_id does not exist
+#error_handler
 @app.errorhandler(404)
 def not_found(error=None):
     message={
