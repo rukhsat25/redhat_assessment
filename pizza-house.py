@@ -6,6 +6,7 @@ from flask import jsonify,request,make_response
 from flask_pymongo import PyMongo
 from bson.json_util import dumps
 from bson.objectid import ObjectId
+import pika
 
 #creating the flask instance
 app=Flask(__name__)
@@ -27,6 +28,31 @@ def home():
 def welcome():
     resp=jsonify("Welcome to Pizza House","status : 200")
     return resp
+
+#routing app for enqueue message API
+connection_parameters=pika.ConnectionParameters('localhost')
+connection=pika.BlockingConnection(connection_parameters)
+channel=connection.channel()
+channel.queue_declare(queue="letterbox")
+@app.route('/order/enqueue',methods=["POST"])
+def order_enqueue():
+    _json=request.json
+    message=_json['order']
+    channel.basic_publish(exchange="",routing_key="letterbox",body=message)
+    return jsonify("Order Enqueue Successfully"," status : 200")
+
+#routing app for dequeue message API
+@app.route('/order/dequeue',methods=["GET"])
+def order_dequeue():
+    def message_received(ch,method,properties,body):
+        global order_count
+        order_count+=1
+        mongo.db.orders.insert_one({'order':body,"order_id":order_count})
+        resp=jsonify(f"Order ID: {order_count}","status : 200")
+        return resp
+    channel.basic_consume(queue="letterbox",auto_ack=False,on_message_callback=message_received)
+    channel.start_consuming()
+
 
 #routing app for order API
 @app.route('/order',methods=["POST"])
